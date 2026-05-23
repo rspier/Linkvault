@@ -1,0 +1,8 @@
+{
+  "name": "LinkVault",
+  "description": "Store and organize links shared from your mobile device. Includes AI-powered tagging, description generation, and offline-ready search.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
