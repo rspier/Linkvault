@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
@@ -7,24 +8,6 @@ import betterSqlite3 from 'better-sqlite3';
 import { z } from 'zod';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// DB Setup
-const db = new betterSqlite3('links.db');
-db.exec(`
-  CREATE TABLE IF NOT EXISTS links (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    url TEXT NOT NULL,
-    title TEXT,
-    description TEXT,
-    tags TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`);
-
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY || '',
-  httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
-});
 
 const LinkSchema = z.object({
   url: z.string().url(),
@@ -38,35 +21,21 @@ async function startServer() {
   app.use(express.urlencoded({ extended: true }));
 
   // API Routes
-  app.get('/api/links', (req, res) => {
-    const { q } = req.query;
-    try {
-      let stmt;
-      if (q && typeof q === 'string') {
-        stmt = db.prepare(`
-          SELECT * FROM links 
-          WHERE title LIKE ? OR description LIKE ? OR tags LIKE ? 
-          ORDER BY created_at DESC
-        `);
-        const search = `%${q}%`;
-        const links = stmt.all(search, search, search);
-        res.json(links.map((l: any) => ({ ...l, tags: JSON.parse(l.tags || '[]') })));
-      } else {
-        stmt = db.prepare('SELECT * FROM links ORDER BY created_at DESC');
-        const links = stmt.all();
-        res.json(links.map((l: any) => ({ ...l, tags: JSON.parse(l.tags || '[]') })));
-      }
-    } catch (error) {
-      console.error('DB Error:', error);
-      res.status(500).json({ error: 'Database error' });
-    }
-  });
-
   app.post('/api/links', async (req, res) => {
     try {
       const { url } = LinkSchema.parse(req.body);
       
-      console.log('Processing URL:', url);
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(400).json({ error: 'GEMINI_API_KEY environment variable is not configured. Please add your API key.' });
+      }
+
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+      });
+      
+      console.log('Processing URL with Gemini:', url);
 
       // AI Processing
       const response = await ai.models.generateContent({
@@ -94,11 +63,7 @@ URL: ${url}`,
       const text = response.text || '{}';
       const analysis = JSON.parse(text);
       
-      const stmt = db.prepare('INSERT INTO links (url, title, description, tags) VALUES (?, ?, ?, ?)');
-      const info = stmt.run(url, analysis.title || url, analysis.description || '', JSON.stringify(analysis.tags || []));
-      
       res.json({ 
-        id: info.lastInsertRowid, 
         url,
         title: analysis.title || url,
         description: analysis.description || '',
@@ -108,16 +73,6 @@ URL: ${url}`,
     } catch (error) {
       console.error('API Error:', error);
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to process link' });
-    }
-  });
-
-  app.delete('/api/links/:id', (req, res) => {
-    const { id } = req.params;
-    try {
-      db.prepare('DELETE FROM links WHERE id = ?').run(id);
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to delete link' });
     }
   });
 
