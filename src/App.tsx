@@ -33,9 +33,7 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 
-import { httpsCallable } from 'firebase/functions';
-
-import { auth, db, functions } from './lib/firebase';
+import { auth, db } from './lib/firebase';
 import { Link } from './types';
 import { cn } from './lib/utils';
 import { Logo } from './components/Logo';
@@ -231,10 +229,23 @@ export default function App() {
     }
 
     try {
-      // 1. Call Gemini analysis Cloud Function
-      const analyzeLinkFn = httpsCallable<{ url: string }, any>(functions, 'analyzeLink');
-      const result = await analyzeLinkFn({ url: newUrl });
-      const analysis = result.data;
+      // 1. Get Firebase ID token and call Go backend
+      const idToken = await user.getIdToken();
+      const resp = await fetch('/api/links', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ url: newUrl })
+      });
+
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to analyze URL');
+      }
+
+      const analysis = await resp.json();
 
       // 2. Save directly to user's Firestore collection
       await addDoc(collection(db, 'users', user.uid, 'links'), {
@@ -272,11 +283,24 @@ export default function App() {
     setError(null);
     const successfullyProcessed: string[] = [];
     
-    const analyzeLinkFn = httpsCallable<{ url: string }, any>(functions, 'analyzeLink');
+    const idToken = await user.getIdToken();
     for (const url of pendingLinks) {
       try {
-        const result = await analyzeLinkFn({ url });
-        const analysis = result.data;
+        const resp = await fetch('/api/links', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+          },
+          body: JSON.stringify({ url })
+        });
+        
+        if (!resp.ok) {
+          console.error(`Failed to process: ${url}`);
+          continue;
+        }
+
+        const analysis = await resp.json();
         
         await addDoc(collection(db, 'users', user.uid, 'links'), {
           url,
