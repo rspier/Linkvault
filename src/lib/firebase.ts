@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import { getFunctions } from 'firebase/functions';
 
 // Client-side Firebase Configuration (populated from Vite environment variables)
 const firebaseConfig = {
@@ -22,5 +23,6 @@ const db = initializeFirestore(app, {
 });
 
 const auth = getAuth(app);
+const functions = getFunctions(app);
 
-export { app, db, auth };
+export { app, db, auth, functions };

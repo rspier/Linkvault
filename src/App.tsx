@@ -33,7 +33,9 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 
-import { auth, db } from './lib/firebase';
+import { httpsCallable } from 'firebase/functions';
+
+import { auth, db, functions } from './lib/firebase';
 import { Link } from './types';
 import { cn } from './lib/utils';
 import { Logo } from './components/Logo';
@@ -129,7 +131,14 @@ export default function App() {
   // Handle share target redirect & cache it if user is not logged in yet
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const shared = params.get('share_url');
+    const urlParam = params.get('url');
+    const textParam = params.get('text');
+    
+    // Find the URL (could be in urlParam, or in textParam)
+    const rawUrl = urlParam || textParam || '';
+    const match = rawUrl.match(/https?:\/\/[^\s]+/);
+    const shared = match ? match[0] : '';
+
     if (shared) {
       localStorage.setItem('shared_url_pending', shared);
       // Clean up URL parameters
@@ -222,19 +231,10 @@ export default function App() {
     }
 
     try {
-      // 1. Call Gemini analysis API hosted on backend
-      const resp = await fetch('/api/links', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: newUrl })
-      });
-      
-      if (!resp.ok) {
-        const data = await resp.json();
-        throw new Error(data.error || 'Failed to analyze URL');
-      }
-      
-      const analysis = await resp.json();
+      // 1. Call Gemini analysis Cloud Function
+      const analyzeLinkFn = httpsCallable<{ url: string }, any>(functions, 'analyzeLink');
+      const result = await analyzeLinkFn({ url: newUrl });
+      const analysis = result.data;
 
       // 2. Save directly to user's Firestore collection
       await addDoc(collection(db, 'users', user.uid, 'links'), {
@@ -272,27 +272,20 @@ export default function App() {
     setError(null);
     const successfullyProcessed: string[] = [];
     
+    const analyzeLinkFn = httpsCallable<{ url: string }, any>(functions, 'analyzeLink');
     for (const url of pendingLinks) {
       try {
-        const resp = await fetch('/api/links', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url })
-        });
+        const result = await analyzeLinkFn({ url });
+        const analysis = result.data;
         
-        if (resp.ok) {
-          const analysis = await resp.json();
-          await addDoc(collection(db, 'users', user.uid, 'links'), {
-            url,
-            title: analysis.title || url,
-            description: analysis.description || '',
-            tags: analysis.tags || [],
-            created_at: analysis.created_at || new Date().toISOString()
-          });
-          successfullyProcessed.push(url);
-        } else {
-          console.error(`Failed to process: ${url}`);
-        }
+        await addDoc(collection(db, 'users', user.uid, 'links'), {
+          url,
+          title: analysis.title || url,
+          description: analysis.description || '',
+          tags: analysis.tags || [],
+          created_at: analysis.created_at || new Date().toISOString()
+        });
+        successfullyProcessed.push(url);
       } catch (err) {
         console.error(`Connection error processing: ${url}`, err);
         break; // Stop and retry later on subsequent connection
