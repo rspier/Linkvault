@@ -74,8 +74,9 @@ deploy-backend:
 	fi
 	@echo "Deploying Go backend to Cloud Run..."
 	cd backend && gcloud run deploy linkvault-backend \
+		--project=$$VITE_FIREBASE_PROJECT_ID \
 		--source . \
-		--region us-central1 \
+		--region us-west1 \
 		--allow-unauthenticated \
 		--set-env-vars="GEMINI_API_KEY=$$GEMINI_API_KEY,FIREBASE_PROJECT_ID=$$VITE_FIREBASE_PROJECT_ID"
 
