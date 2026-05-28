@@ -50,7 +50,38 @@ export default function App() {
   const [loadingAuthAction, setLoadingAuthAction] = useState(false);
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<TabType>('library');
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    const hash = window.location.hash.replace('#', '');
+    const validTabs: TabType[] = ['library', 'process', 'explore', 'prefs'];
+    return validTabs.includes(hash as TabType) ? (hash as TabType) : 'library';
+  });
+
+  // Synchronize Tab State with URL Hash (adds back button support)
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      const validTabs: TabType[] = ['library', 'process', 'explore', 'prefs'];
+      if (validTabs.includes(hash as TabType)) {
+        setActiveTab(hash as TabType);
+      } else {
+        setActiveTab('library');
+        if (hash !== 'library' && hash !== '') {
+          window.location.hash = 'library';
+        }
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    
+    // Sync hash on mount if it's empty
+    const currentHash = window.location.hash.replace('#', '');
+    const validTabs: TabType[] = ['library', 'process', 'explore', 'prefs'];
+    if (!validTabs.includes(currentHash as TabType)) {
+      window.location.hash = 'library';
+    }
+
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // App logic state
   const [links, setLinks] = useState<Link[]>([]);
@@ -178,7 +209,7 @@ export default function App() {
     if (!confirm('Are you sure you want to sign out?')) return;
     try {
       await signOut(auth);
-      setActiveTab('library');
+      window.location.hash = 'library';
     } catch (err) {
       console.error('Sign out error:', err);
     }
@@ -732,7 +763,7 @@ export default function App() {
                         key={tag}
                         onClick={() => {
                           setSearchQuery(tag);
-                          setActiveTab('library');
+                          window.location.hash = 'library';
                         }}
                         className="flex items-center gap-1.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200/60 rounded-xl px-3.5 py-1.5 transition-all text-left"
                       >
@@ -821,20 +852,20 @@ export default function App() {
       {/* Bottom Navigation */}
       <nav className="bg-white border-t border-slate-200 h-20 flex items-center justify-around px-6 fixed bottom-0 left-0 right-0 z-50 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
         <button 
-          onClick={() => setActiveTab('library')}
+          onClick={() => window.location.hash = 'library'}
           className={cn(
-            "flex flex-col items-center gap-1.5 transition-transform active:scale-90",
-            activeTab === 'library' ? "text-indigo-600 font-extrabold" : "text-slate-400"
+             "flex flex-col items-center gap-1.5 transition-transform active:scale-90",
+             activeTab === 'library' ? "text-indigo-600 font-extrabold" : "text-slate-400"
           )}
         >
           <Clock size={22} strokeWidth={activeTab === 'library' ? 2.5 : 2} />
           <span className="text-[10px] font-bold uppercase tracking-wider">Library</span>
         </button>
         <button 
-          onClick={() => setActiveTab('process')}
+          onClick={() => window.location.hash = 'process'}
           className={cn(
-            "flex flex-col items-center gap-1.5 transition-transform active:scale-90 relative",
-            activeTab === 'process' ? "text-indigo-600 font-extrabold" : "text-slate-400"
+             "flex flex-col items-center gap-1.5 transition-transform active:scale-90 relative",
+             activeTab === 'process' ? "text-indigo-600 font-extrabold" : "text-slate-400"
           )}
         >
           <Share2 size={22} strokeWidth={activeTab === 'process' ? 2.5 : 2} />
@@ -846,20 +877,20 @@ export default function App() {
           <span className="text-[10px] font-bold uppercase tracking-wider">Process</span>
         </button>
         <button 
-          onClick={() => setActiveTab('explore')}
+          onClick={() => window.location.hash = 'explore'}
           className={cn(
-            "flex flex-col items-center gap-1.5 transition-transform active:scale-90",
-            activeTab === 'explore' ? "text-indigo-600 font-extrabold" : "text-slate-400"
+             "flex flex-col items-center gap-1.5 transition-transform active:scale-90",
+             activeTab === 'explore' ? "text-indigo-600 font-extrabold" : "text-slate-400"
           )}
         >
           <SearchIcon size={22} strokeWidth={activeTab === 'explore' ? 2.5 : 2} />
           <span className="text-[10px] font-bold uppercase tracking-wider">Explore</span>
         </button>
         <button 
-          onClick={() => setActiveTab('prefs')}
+          onClick={() => window.location.hash = 'prefs'}
           className={cn(
-            "flex flex-col items-center gap-1.5 transition-transform active:scale-90",
-            activeTab === 'prefs' ? "text-indigo-600 font-extrabold" : "text-slate-400"
+             "flex flex-col items-center gap-1.5 transition-transform active:scale-90",
+             activeTab === 'prefs' ? "text-indigo-600 font-extrabold" : "text-slate-400"
           )}
         >
           <Hash size={22} strokeWidth={activeTab === 'prefs' ? 2.5 : 2} />
