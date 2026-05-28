@@ -14,7 +14,8 @@ import {
   Activity, 
   CheckCircle,
   Database,
-  RefreshCw
+  RefreshCw,
+  Pencil
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -101,6 +102,24 @@ export default function App() {
   });
   const [isProcessingPending, setIsProcessingPending] = useState(false);
   const [reprocessingLinkId, setReprocessingLinkId] = useState<string | null>(null);
+
+  // Edit Link State
+  const [editingLink, setEditingLink] = useState<Link | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editTags, setEditTags] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // Prefill edit form when editingLink changes
+  useEffect(() => {
+    if (editingLink) {
+      setEditTitle(editingLink.title || '');
+      setEditDescription(editingLink.description || '');
+      setEditTags(editingLink.tags ? editingLink.tags.join(', ') : '');
+      setEditError(null);
+    }
+  }, [editingLink]);
 
   // Listen to network online status dynamically
   useEffect(() => {
@@ -345,6 +364,36 @@ export default function App() {
       await deleteDoc(doc(db, 'users', user.uid, 'links', id));
     } catch (err) {
       console.error('Delete error:', err);
+    }
+  };
+
+  const handleUpdateLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingLink || !user) return;
+    
+    setIsSavingEdit(true);
+    setEditError(null);
+    
+    try {
+      const docRef = doc(db, 'users', user.uid, 'links', editingLink.id);
+      
+      const tagsArray = editTags
+        .split(',')
+        .map(t => t.trim())
+        .filter(t => t.length > 0);
+      
+      await updateDoc(docRef, {
+        title: editTitle,
+        description: editDescription,
+        tags: tagsArray
+      });
+      
+      setEditingLink(null);
+    } catch (err: any) {
+      console.error("Error updating link:", err);
+      setEditError(err.message || "Failed to update link");
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -635,6 +684,13 @@ export default function App() {
                           >
                             <ExternalLink size={18} />
                           </a>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setEditingLink(link); }}
+                            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            title="Edit link details"
+                          >
+                            <Pencil size={18} />
+                          </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); handleReprocess(link); }}
                             disabled={reprocessingLinkId === link.id}
@@ -989,6 +1045,102 @@ export default function App() {
                     <span className="uppercase tracking-widest text-xs">ARCHIVE NOW</span>
                   )}
                 </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Link Modal */}
+      <AnimatePresence>
+        {editingLink && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden"
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                <h3 className="font-semibold text-slate-800 text-lg">Edit Link Details</h3>
+                <button
+                  onClick={() => setEditingLink(null)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              
+              <form onSubmit={handleUpdateLink} className="p-6 space-y-4">
+                {editError && (
+                  <div className="p-3 text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-lg">
+                    {editError}
+                  </div>
+                )}
+                
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Title
+                  </label>
+                  <input
+                    type="text"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    required
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-normal transition-all text-sm"
+                    placeholder="e.g. Awesome Project Page"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Description
+                  </label>
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    rows={3}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-normal transition-all text-sm resize-none"
+                    placeholder="Enter description..."
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Tags (comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={editTags}
+                    onChange={(e) => setEditTags(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-normal transition-all text-sm"
+                    placeholder="e.g. tech, coding, design"
+                  />
+                </div>
+
+                <div className="flex gap-3 justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingLink(null)}
+                    className="px-4 py-2 border border-slate-200 text-slate-600 text-xs font-semibold rounded-xl hover:bg-slate-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingEdit}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isSavingEdit ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Changes'
+                    )}
+                  </button>
+                </div>
               </form>
             </motion.div>
           </div>
