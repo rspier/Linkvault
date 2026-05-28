@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -74,6 +75,56 @@ type AnalyzeResponse struct {
 	Description string   `json:"description"`
 	Tags        []string `json:"tags"`
 	CreatedAt   string   `json:"created_at"`
+}
+
+func fetchPageMetadata(ctx context.Context, targetURL string) (string, error) {
+	// Create client with timeout
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", targetURL, nil)
+	if err != nil {
+		return "", err
+	}
+
+	// Use a standard browser User-Agent to avoid basic crawler blocks
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("bad status code: %d", resp.StatusCode)
+	}
+
+	// Limit reading to 64KB to avoid consuming too much memory/bandwidth
+	const maxRead = 64 * 1024
+	buf := make([]byte, maxRead)
+	n, err := io.ReadFull(resp.Body, buf)
+	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
+		return "", err
+	}
+	htmlContent := string(buf[:n])
+
+	// Try to extract <head>...</head> content as it contains most metadata (title, og:description, etc.)
+	lowerContent := strings.ToLower(htmlContent)
+	headStart := strings.Index(lowerContent, "<head>")
+	headEnd := strings.Index(lowerContent, "</head>")
+
+	if headStart != -1 && headEnd != -1 && headEnd > headStart {
+		return htmlContent[headStart : headEnd+7], nil
+	}
+
+	// If no head tag is found, fallback to the first 10KB of HTML body
+	if len(htmlContent) > 10240 {
+		return htmlContent[:10240], nil
+	}
+	return htmlContent, nil
 }
 
 func analyzeLinkHandler(w http.ResponseWriter, r *http.Request) {
@@ -155,7 +206,16 @@ func analyzeLinkHandler(w http.ResponseWriter, r *http.Request) {
 		ResponseSchema:   responseSchema,
 	}
 
-	prompt := fmt.Sprintf("Analyze this URL and provide metadata for a link-saving app.\nURL: %s", req.URL)
+	// Try to fetch target webpage context
+	pageContext, err := fetchPageMetadata(ctx, req.URL)
+	var prompt string
+	if err != nil {
+		log.Printf("Warning: Failed to fetch metadata for URL %s: %v. Falling back to URL-only analysis.", req.URL, err)
+		prompt = fmt.Sprintf("Analyze this URL and provide metadata for a link-saving app.\nURL: %s", req.URL)
+	} else {
+		log.Printf("Successfully retrieved HTML metadata context for URL: %s", req.URL)
+		prompt = fmt.Sprintf("Analyze this URL and the provided HTML context to generate metadata for a link-saving app.\nURL: %s\n\nHTML Context:\n%s", req.URL, pageContext)
+	}
 
 	log.Printf("Sending request to Gemini model for URL: %s", req.URL)
 	result, err := client.Models.GenerateContent(
