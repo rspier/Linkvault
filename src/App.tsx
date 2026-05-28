@@ -412,7 +412,8 @@ export default function App() {
       await updateDoc(docRef, {
         title: editTitle,
         description: editDescription,
-        tags: tagsArray
+        tags: tagsArray,
+        updated_at: new Date().toISOString()
       });
       
       setEditingLink(null);
@@ -453,7 +454,8 @@ export default function App() {
       await updateDoc(doc(db, 'users', user.uid, 'links', link.id), {
         title: analysis.title || link.url,
         description: analysis.description || '',
-        tags: analysis.tags || []
+        tags: analysis.tags || [],
+        updated_at: new Date().toISOString()
       });
     } catch (err: any) {
       console.error('Failed to reprocess link:', err);
@@ -675,14 +677,40 @@ export default function App() {
                               </a>
                             </h3>
                           </div>
-                          <p className="text-[11px] font-medium text-slate-400 truncate mb-2">
-                            {(() => {
-                              try {
-                                return new URL(link.url).hostname;
-                              } catch {
-                                return link.url;
-                              }
-                            })()}
+                          <p className="text-[11px] font-medium text-slate-400 truncate mb-2 flex items-center gap-1.5 flex-wrap">
+                            <span>
+                              {(() => {
+                                try {
+                                  return new URL(link.url).hostname;
+                                } catch {
+                                  return link.url;
+                                }
+                              })()}
+                            </span>
+                            {link.created_at && (
+                              <>
+                                <span className="text-slate-300 select-none">•</span>
+                                <span title={`Saved at ${new Date(link.created_at).toLocaleString()}`}>
+                                  Saved {new Date(link.created_at).toLocaleDateString(undefined, {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric'
+                                  })}
+                                </span>
+                              </>
+                            )}
+                            {link.updated_at && (
+                              <>
+                                <span className="text-slate-300 select-none">•</span>
+                                <span title={`Edited at ${new Date(link.updated_at).toLocaleString()}`}>
+                                  Edited {new Date(link.updated_at).toLocaleDateString(undefined, {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric'
+                                  })}
+                                </span>
+                              </>
+                            )}
                           </p>
                           <p className={cn(
                             "text-sm text-slate-600 leading-relaxed font-normal transition-all duration-200",
