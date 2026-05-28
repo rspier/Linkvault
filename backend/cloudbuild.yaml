@@ -1,12 +1,12 @@
 steps:
-  # 1. Pull the previous builder and final images from GCR to use as cache sources
+  # 1. Pull the previous builder and final images from Artifact Registry to use as cache sources
   - name: 'gcr.io/cloud-builders/docker'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        docker pull gcr.io/${PROJECT_ID}/linkvault-backend-builder:latest || true
-        docker pull gcr.io/${PROJECT_ID}/linkvault-backend:latest || true
+        docker pull us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend-builder:latest || true
+        docker pull us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend:latest || true
 
   # 2. Build the builder stage, utilizing the builder cache image
   - name: 'gcr.io/cloud-builders/docker'
@@ -15,9 +15,9 @@ steps:
       - '--target'
       - 'builder'
       - '--cache-from'
-      - 'gcr.io/${PROJECT_ID}/linkvault-backend-builder:latest'
+      - 'us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend-builder:latest'
       - '-t'
-      - 'gcr.io/${PROJECT_ID}/linkvault-backend-builder:latest'
+      - 'us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend-builder:latest'
       - '.'
 
   # 3. Build the final image using both the builder and final cache images
@@ -25,14 +25,14 @@ steps:
     args:
       - 'build'
       - '--cache-from'
-      - 'gcr.io/${PROJECT_ID}/linkvault-backend-builder:latest'
+      - 'us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend-builder:latest'
       - '--cache-from'
-      - 'gcr.io/${PROJECT_ID}/linkvault-backend:latest'
+      - 'us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend:latest'
       - '-t'
-      - 'gcr.io/${PROJECT_ID}/linkvault-backend:latest'
+      - 'us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend:latest'
       - '.'
 
-# Push both images back to GCR so they are updated for the next build's cache
+# Push both images back to Artifact Registry
 images:
-  - 'gcr.io/${PROJECT_ID}/linkvault-backend-builder:latest'
-  - 'gcr.io/${PROJECT_ID}/linkvault-backend:latest'
+  - 'us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend-builder:latest'
+  - 'us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend:latest'

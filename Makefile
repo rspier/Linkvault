@@ -72,12 +72,17 @@ deploy-backend:
 		echo "Error: GEMINI_API_KEY environment variable is missing."; \
 		exit 1; \
 	fi
+	@echo "Ensuring Artifact Registry repository exists..."
+	-gcloud artifacts repositories create linkvault \
+		--repository-format=docker \
+		--location=us-west1 \
+		--project=$$VITE_FIREBASE_PROJECT_ID 2>/dev/null || true
 	@echo "Submitting cached multi-stage build to Cloud Build..."
 	cd backend && gcloud builds submit --config cloudbuild.yaml --project=$$VITE_FIREBASE_PROJECT_ID .
 	@echo "Deploying built container image to Cloud Run..."
 	gcloud run deploy linkvault-backend \
 		--project=$$VITE_FIREBASE_PROJECT_ID \
-		--image=gcr.io/$$VITE_FIREBASE_PROJECT_ID/linkvault-backend:latest \
+		--image=us-west1-docker.pkg.dev/$$VITE_FIREBASE_PROJECT_ID/linkvault/backend:latest \
 		--region us-west1 \
 		--allow-unauthenticated \
 		--set-env-vars="GEMINI_API_KEY=$$GEMINI_API_KEY,FIREBASE_PROJECT_ID=$$VITE_FIREBASE_PROJECT_ID"
