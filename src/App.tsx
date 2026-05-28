@@ -592,8 +592,10 @@ export default function App() {
                       <div className="flex justify-between items-start">
                         <div className="flex-1 min-w-0 pr-4">
                           <div className="flex items-center justify-between mb-1">
-                            <h3 className="font-semibold text-slate-800 leading-tight truncate pr-2">
-                              {link.title}
+                            <h3 className="font-semibold text-slate-800 hover:text-indigo-600 transition-colors leading-tight truncate pr-2">
+                              <a href={link.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                                {link.title}
+                              </a>
                             </h3>
                           </div>
                           <p className="text-[11px] font-medium text-slate-400 truncate mb-2">
