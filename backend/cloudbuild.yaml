@@ -1,0 +1,41 @@
+steps:
+  # 1. Restore Go cache from GCS bucket
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gcloud storage cp gs://${PROJECT_ID}-build-cache/go-cache.tar.gz go-cache.tar.gz || echo "No cache found"
+        if [ -f go-cache.tar.gz ]; then
+          tar -xzf go-cache.tar.gz
+        fi
+
+  # 2. Compile Go binary in Go compiler container using local cache directories
+  - name: 'golang:1.25-alpine'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        export GOCACHE=/workspace/.cache/go-build
+        export GOPATH=/workspace/.cache/go-path
+        mkdir -p $$GOCACHE $$GOPATH
+        CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o main .
+
+  # 3. Create the cache archive and upload it back to GCS for the next build
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        if [ -d .cache ]; then
+          tar -czf go-cache.tar.gz .cache
+          gcloud storage cp go-cache.tar.gz gs://${PROJECT_ID}-build-cache/go-cache.tar.gz || echo "Failed to save cache"
+        fi
+
+  # 4. Build the final runtime Docker container using the pre-compiled binary
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-f', 'Dockerfile.runtime', '-t', 'gcr.io/${PROJECT_ID}/linkvault-backend:latest', '.']
+
+# Specify the image to push to Artifact Registry / GCR
+images:
+  - 'gcr.io/${PROJECT_ID}/linkvault-backend:latest'
