@@ -72,9 +72,7 @@ deploy-backend:
 		echo "Error: GEMINI_API_KEY environment variable is missing."; \
 		exit 1; \
 	fi
-	@echo "Ensuring Cloud Storage bucket for build caching exists..."
-	-gcloud storage buckets create gs://$$VITE_FIREBASE_PROJECT_ID-build-cache --project=$$VITE_FIREBASE_PROJECT_ID --location=us-west1 2>/dev/null || true
-	@echo "Submitting cached Go build to Cloud Build..."
+	@echo "Submitting cached multi-stage build to Cloud Build..."
 	cd backend && gcloud builds submit --config cloudbuild.yaml --project=$$VITE_FIREBASE_PROJECT_ID .
 	@echo "Deploying built container image to Cloud Run..."
 	gcloud run deploy linkvault-backend \
