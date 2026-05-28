@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "linkvault-1000",
     "public": "dist",
     "ignore": [
       "firebase.json",

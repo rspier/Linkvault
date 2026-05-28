@@ -83,7 +83,7 @@ deploy-backend:
 .PHONY: deploy-frontend
 deploy-frontend: build-frontend
 	@echo "Deploying React frontend to Firebase Hosting..."
-	npx firebase deploy --only hosting
+	npx firebase-tools deploy --only hosting --project=$$VITE_FIREBASE_PROJECT_ID
 
 .PHONY: deploy
 deploy: deploy-backend deploy-frontend
