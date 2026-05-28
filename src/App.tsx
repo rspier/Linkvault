@@ -13,7 +13,8 @@ import {
   User as UserIcon, 
   Activity, 
   CheckCircle,
-  Database
+  Database,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -30,7 +31,8 @@ import {
   doc, 
   query, 
   orderBy, 
-  onSnapshot
+  onSnapshot,
+  updateDoc
 } from 'firebase/firestore';
 
 import { auth, db } from './lib/firebase';
@@ -67,6 +69,7 @@ export default function App() {
     }
   });
   const [isProcessingPending, setIsProcessingPending] = useState(false);
+  const [reprocessingLinkId, setReprocessingLinkId] = useState<string | null>(null);
 
   // Listen to network online status dynamically
   useEffect(() => {
@@ -298,6 +301,45 @@ export default function App() {
       await deleteDoc(doc(db, 'users', user.uid, 'links', id));
     } catch (err) {
       console.error('Delete error:', err);
+    }
+  };
+
+  const handleReprocess = async (link: Link) => {
+    if (!user) return;
+    if (!navigator.onLine) {
+      alert('You are currently offline. Please connect to the internet to reprocess links!');
+      return;
+    }
+
+    setReprocessingLinkId(link.id);
+    try {
+      const idToken = await user.getIdToken();
+      const resp = await fetch('/api/links', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ url: link.url })
+      });
+
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to reprocess link');
+      }
+
+      const analysis = await resp.json();
+
+      await updateDoc(doc(db, 'users', user.uid, 'links', link.id), {
+        title: analysis.title || link.url,
+        description: analysis.description || '',
+        tags: analysis.tags || []
+      });
+    } catch (err: any) {
+      console.error('Failed to reprocess link:', err);
+      alert(err.message || 'Failed to reprocess link.');
+    } finally {
+      setReprocessingLinkId(null);
     }
   };
 
@@ -543,12 +585,26 @@ export default function App() {
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            title="Open link"
                           >
                             <ExternalLink size={18} />
                           </a>
                           <button
+                            onClick={(e) => { e.stopPropagation(); handleReprocess(link); }}
+                            disabled={reprocessingLinkId === link.id}
+                            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50"
+                            title="Reprocess with Gemini AI"
+                          >
+                            {reprocessingLinkId === link.id ? (
+                              <Loader2 size={18} className="animate-spin text-indigo-600" />
+                            ) : (
+                              <RefreshCw size={18} />
+                            )}
+                          </button>
+                          <button
                             onClick={(e) => { e.stopPropagation(); handleDelete(link.id); }}
                             className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                            title="Delete link"
                           >
                             <Trash2 size={18} />
                           </button>
