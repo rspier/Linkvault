@@ -225,6 +225,32 @@ export default function App() {
     }
   };
 
+  const [isClearingCache, setIsClearingCache] = useState(false);
+
+  const handleForceUpdate = async () => {
+    setIsClearingCache(true);
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        for (const key of keys) {
+          await caches.delete(key);
+        }
+      }
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const registration of registrations) {
+          await registration.unregister();
+        }
+      }
+      window.location.href = window.location.origin + window.location.pathname + '?cb=' + Date.now() + window.location.hash;
+    } catch (err) {
+      console.error('Failed to clear cache and update:', err);
+      window.location.reload();
+    } finally {
+      setIsClearingCache(false);
+    }
+  };
+
   const handleSignOut = async () => {
     if (!confirm('Are you sure you want to sign out?')) return;
     try {
@@ -909,6 +935,29 @@ export default function App() {
                   <span className="text-slate-400 font-medium">Local Index Cache</span>
                   <span className="text-slate-700 font-bold uppercase tracking-wider">IndexedDB Persisted</span>
                 </div>
+              </div>
+
+              {/* Application Updates & Cache */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
+                <div>
+                  <h4 className="font-black text-slate-800 text-sm uppercase tracking-wider">Application Cache</h4>
+                  <p className="text-slate-500 text-xs mt-1">
+                    If the app is not updating correctly on your device, clear the cached assets to force-download the latest version.
+                  </p>
+                </div>
+                
+                <button
+                  onClick={handleForceUpdate}
+                  disabled={isClearingCache}
+                  className="w-full flex items-center justify-center gap-2.5 bg-indigo-50 hover:bg-indigo-100/70 border border-indigo-100 text-indigo-600 font-extrabold py-3.5 rounded-xl transition-all active:scale-[0.98] disabled:opacity-50"
+                >
+                  {isClearingCache ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    <RefreshCw size={18} />
+                  )}
+                  <span className="uppercase tracking-widest text-xs">Force Update & Clear Cache</span>
+                </button>
               </div>
 
               {/* Actions Card */}
