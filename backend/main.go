@@ -220,7 +220,7 @@ func analyzeLinkHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Sending request to Gemini model for URL: %s", req.URL)
 	result, err := client.Models.GenerateContent(
 		ctx,
-		"gemini-2.5-flash",
+		"gemini-2.5-flash-lite",
 		genai.Text(prompt),
 		config,
 	)
