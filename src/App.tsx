@@ -218,7 +218,20 @@ export default function App() {
   const handleAddLink = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUrl || !user) return;
-    
+
+    const formattedUrl = newUrl.trim();
+    const isDuplicate = links.some(link => link.url.toLowerCase() === formattedUrl.toLowerCase());
+    if (isDuplicate) {
+      setError("This URL is already saved in your vault.");
+      return;
+    }
+
+    const isPendingDuplicate = pendingLinks.some(url => url.toLowerCase() === formattedUrl.toLowerCase());
+    if (isPendingDuplicate) {
+      setError("This URL is already in your offline processing queue.");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
