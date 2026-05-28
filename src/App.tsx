@@ -110,6 +110,7 @@ export default function App() {
   const [editTags, setEditTags] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [expandedLinkId, setExpandedLinkId] = useState<string | null>(null);
 
   // Prefill edit form when editingLink changes
   useEffect(() => {
@@ -636,10 +637,11 @@ export default function App() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.98 }}
+                      onClick={() => setExpandedLinkId(prev => prev === link.id ? null : link.id)}
                       className="bg-white rounded-xl border border-slate-200 p-4 active:bg-slate-50 transition-colors cursor-pointer group shadow-xs border-b-2 border-b-slate-200/60"
                     >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1 min-w-0 pr-4">
+                      <div className="flex flex-col md:flex-row md:justify-between md:items-start">
+                        <div className="flex-1 min-w-0 md:pr-4 w-full">
                           <div className="flex items-center justify-between mb-1">
                             <h3 className="font-semibold text-slate-800 hover:text-indigo-600 transition-colors leading-tight truncate pr-2">
                               <a href={link.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
@@ -656,7 +658,10 @@ export default function App() {
                               }
                             })()}
                           </p>
-                          <p className="text-sm text-slate-600 line-clamp-2 leading-relaxed font-normal">
+                          <p className={cn(
+                            "text-sm text-slate-600 leading-relaxed font-normal transition-all duration-200",
+                            expandedLinkId === link.id ? "" : "line-clamp-2"
+                          )}>
                             {link.description}
                           </p>
                           <div className="flex flex-wrap gap-2 mt-4">
@@ -674,13 +679,14 @@ export default function App() {
                             ))}
                           </div>
                         </div>
-                        <div className="flex flex-col gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                        <div className="flex flex-row md:flex-col gap-3 md:gap-1.5 mt-4 md:mt-0 justify-end items-center md:items-start opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity border-t border-slate-100 md:border-none pt-3 md:pt-0">
                           <a 
                             href={link.url} 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                             title="Open link"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             <ExternalLink size={18} />
                           </a>
