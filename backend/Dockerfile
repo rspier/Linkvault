@@ -3,18 +3,16 @@ FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-# Copy dependency files
+# Download Go module dependencies.
 COPY go.mod go.sum ./
-# Cache Go modules
-RUN --mount=type=cache,target=/go/pkg/mod go mod download
+RUN go mod download
 
-# Copy source code
+# Copy the rest of the application source code.
 COPY . .
 
-# Build the binary using caching mounts for dependencies and compiler cache
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux go build -o main .
+# Compile the Go application binary.
+# CGO_ENABLED=0 produces a statically-linked binary.
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o main .
 
 # Use a lightweight distroless image for execution
 FROM gcr.io/distroless/static-debian12:latest
