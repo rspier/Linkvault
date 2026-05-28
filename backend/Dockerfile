@@ -1,17 +1,20 @@
-# Use the official Go image to build the binary
-FROM golang:1.25 AS builder
+# Use a lightweight Go alpine image to build the binary
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
 # Copy dependency files
 COPY go.mod go.sum ./
-RUN go mod download
+# Cache Go modules
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
 # Copy source code
 COPY . .
 
-# Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -o main .
+# Build the binary using caching mounts for dependencies and compiler cache
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build -o main .
 
 # Use a lightweight distroless image for execution
 FROM gcr.io/distroless/static-debian12:latest
