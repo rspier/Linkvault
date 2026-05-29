@@ -41,7 +41,7 @@ import { Link } from './types';
 import { cn } from './lib/utils';
 import { Logo } from './components/Logo';
 
-type TabType = 'library' | 'process' | 'explore' | 'prefs';
+type TabType = 'library' | 'explore' | 'prefs';
 
 export default function App() {
   // Auth state
@@ -53,7 +53,7 @@ export default function App() {
   // Tab State
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     const hash = window.location.hash.replace('#', '');
-    const validTabs: TabType[] = ['library', 'process', 'explore', 'prefs'];
+    const validTabs: TabType[] = ['library', 'explore', 'prefs'];
     return validTabs.includes(hash as TabType) ? (hash as TabType) : 'library';
   });
 
@@ -61,7 +61,7 @@ export default function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
-      const validTabs: TabType[] = ['library', 'process', 'explore', 'prefs'];
+      const validTabs: TabType[] = ['library', 'explore', 'prefs'];
       if (validTabs.includes(hash as TabType)) {
         setActiveTab(hash as TabType);
       } else {
@@ -76,7 +76,7 @@ export default function App() {
     
     // Sync hash on mount if it's empty
     const currentHash = window.location.hash.replace('#', '');
-    const validTabs: TabType[] = ['library', 'process', 'explore', 'prefs'];
+    const validTabs: TabType[] = ['library', 'explore', 'prefs'];
     if (!validTabs.includes(currentHash as TabType)) {
       window.location.hash = 'library';
     }
@@ -787,72 +787,6 @@ export default function App() {
             </motion.div>
           )}
 
-          {activeTab === 'process' && (
-            <motion.div
-              key="process"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="mt-6 px-4 space-y-5"
-            >
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
-                <h3 className="font-extrabold text-slate-800 text-lg mb-1 flex items-center gap-2">
-                  <Database size={20} className="text-indigo-600" />
-                  Offline Sync Queue
-                </h3>
-                <p className="text-slate-500 text-xs leading-relaxed font-medium">
-                  When you save links without internet access, LinkVault queues them locally.
-                  Once you reconnect, tap <b>Process Queue</b> below to trigger the Gemini AI title generation, summarizing, and tag generation pipeline.
-                </p>
-              </div>
-
-              {pendingLinks.length > 0 ? (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center px-1">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      {pendingLinks.length} Queue Items
-                    </span>
-                    <button
-                      onClick={processPendingLinks}
-                      disabled={isProcessingPending}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black py-2 px-4 rounded-lg tracking-wider transition-colors active:scale-95 disabled:opacity-50"
-                    >
-                      {isProcessingPending ? 'SYNCING QUEUE...' : 'PROCESS QUEUE'}
-                    </button>
-                  </div>
-
-                  <div className="space-y-3">
-                    {pendingLinks.map((url, i) => (
-                      <div 
-                        key={url + i} 
-                        className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between shadow-xs"
-                      >
-                        <div className="min-w-0 flex-1 pr-4">
-                          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">Queue ID #{i+1}</p>
-                          <p className="text-sm font-semibold text-slate-800 truncate leading-relaxed">{url}</p>
-                        </div>
-                        <button
-                          onClick={() => setPendingLinks(prev => prev.filter((_, idx) => idx !== i))}
-                          className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors shrink-0"
-                        >
-                          <X size={18} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-20 bg-slate-100/50 rounded-2xl border border-dashed border-slate-200 mx-1 flex flex-col items-center justify-center p-6">
-                  <CheckCircle size={36} className="text-emerald-500 mb-3" />
-                  <p className="text-slate-700 font-bold text-sm">Everything is Synced</p>
-                  <p className="text-slate-400 text-xs max-w-xs mt-1 leading-relaxed">
-                    All your saved links have successfully been enriched by Gemini AI and synced to Google Firestore.
-                  </p>
-                </div>
-              )}
-            </motion.div>
-          )}
-
           {activeTab === 'explore' && (
             <motion.div
               key="explore"
@@ -947,6 +881,75 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Offline Sync Queue Section */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
+                <h4 className="font-black text-slate-800 text-sm uppercase tracking-wider flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <Database size={18} className="text-indigo-600" />
+                    Offline Sync Queue
+                  </span>
+                  {pendingLinks.length > 0 && (
+                    <span className="bg-indigo-100 text-indigo-800 font-extrabold px-2 py-0.5 rounded text-[9px] uppercase tracking-wider">
+                      {pendingLinks.length} Pending
+                    </span>
+                  )}
+                </h4>
+                
+                <p className="text-slate-500 text-xs leading-relaxed font-medium">
+                  When you save links without internet access, LinkVault queues them locally.
+                  Once you reconnect, tap <b>Process Queue</b> below to trigger the Gemini AI title generation, summarizing, and tag generation pipeline.
+                </p>
+
+                {pendingLinks.length > 0 ? (
+                  <div className="space-y-3 pt-2">
+                    <button
+                      onClick={processPendingLinks}
+                      disabled={isProcessingPending}
+                      className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 text-xs uppercase tracking-widest"
+                    >
+                      {isProcessingPending ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          <span>Syncing Queue...</span>
+                        </>
+                      ) : (
+                        <span>Process Queue</span>
+                      )}
+                    </button>
+
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                      {pendingLinks.map((url, i) => (
+                        <div 
+                          key={url + i} 
+                          className="bg-slate-50 border border-slate-200/60 rounded-xl p-3 flex items-center justify-between shadow-xs"
+                        >
+                          <div className="min-w-0 flex-1 pr-3">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Queue ID #{i+1}</p>
+                            <p className="text-xs font-semibold text-slate-700 truncate leading-relaxed">{url}</p>
+                          </div>
+                          <button
+                            onClick={() => setPendingLinks(prev => prev.filter((_, idx) => idx !== i))}
+                            className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors shrink-0"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 bg-slate-50 border border-slate-200/60 rounded-xl p-4">
+                    <CheckCircle size={20} className="text-emerald-500 shrink-0" />
+                    <div>
+                      <p className="text-slate-700 font-bold text-xs">Everything is Synced</p>
+                      <p className="text-slate-400 text-[10px] leading-relaxed mt-0.5">
+                        No links in offline queue.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Cloud Sync Database Status */}
               <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
                 <h4 className="font-black text-slate-800 text-sm uppercase tracking-wider">Cloud Data Source</h4>
@@ -1016,21 +1019,6 @@ export default function App() {
           <span className="text-[10px] font-bold uppercase tracking-wider">Library</span>
         </button>
         <button 
-          onClick={() => window.location.hash = 'process'}
-          className={cn(
-             "flex flex-col items-center gap-1.5 transition-transform active:scale-90 relative",
-             activeTab === 'process' ? "text-indigo-600 font-extrabold" : "text-slate-400"
-          )}
-        >
-          <Share2 size={22} strokeWidth={activeTab === 'process' ? 2.5 : 2} />
-          {pendingLinks.length > 0 && (
-            <span className="absolute -top-1 -right-1.5 w-4 h-4 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[9px] font-black animate-none">
-              {pendingLinks.length}
-            </span>
-          )}
-          <span className="text-[10px] font-bold uppercase tracking-wider">Process</span>
-        </button>
-        <button 
           onClick={() => window.location.hash = 'explore'}
           className={cn(
              "flex flex-col items-center gap-1.5 transition-transform active:scale-90",
@@ -1043,11 +1031,16 @@ export default function App() {
         <button 
           onClick={() => window.location.hash = 'prefs'}
           className={cn(
-             "flex flex-col items-center gap-1.5 transition-transform active:scale-90",
+             "flex flex-col items-center gap-1.5 transition-transform active:scale-90 relative",
              activeTab === 'prefs' ? "text-indigo-600 font-extrabold" : "text-slate-400"
           )}
         >
           <Hash size={22} strokeWidth={activeTab === 'prefs' ? 2.5 : 2} />
+          {pendingLinks.length > 0 && (
+            <span className="absolute -top-1 -right-1.5 w-4 h-4 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[9px] font-black animate-none">
+              {pendingLinks.length}
+            </span>
+          )}
           <span className="text-[10px] font-bold uppercase tracking-wider">Prefs</span>
         </button>
       </nav>
