@@ -15,7 +15,9 @@ import {
   CheckCircle,
   Database,
   RefreshCw,
-  Pencil
+  Pencil,
+  Star,
+  ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -42,6 +44,98 @@ import { cn } from './lib/utils';
 import { Logo } from './components/Logo';
 
 type TabType = 'library' | 'explore' | 'prefs';
+
+interface StarSelectorProps {
+  currentStar: string | undefined;
+  onSelect: (starType: string) => void;
+}
+
+function StarSelector({ currentStar, onSelect }: StarSelectorProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const starsList = [
+    { key: 'yellow', color: 'text-amber-400 fill-amber-400', hoverBg: 'hover:bg-amber-50', label: 'Important', dotBg: 'bg-amber-400' },
+    { key: 'blue', color: 'text-sky-400 fill-sky-400', hoverBg: 'hover:bg-sky-50', label: 'Read Later', dotBg: 'bg-sky-400' },
+    { key: 'green', color: 'text-emerald-400 fill-emerald-400', hoverBg: 'hover:bg-emerald-50', label: 'Reference', dotBg: 'bg-emerald-400' },
+    { key: 'red', color: 'text-rose-400 fill-rose-400', hoverBg: 'hover:bg-rose-50', label: 'Priority', dotBg: 'bg-rose-400' },
+    { key: 'orange', color: 'text-orange-400 fill-orange-400', hoverBg: 'hover:bg-orange-50', label: 'Ideas', dotBg: 'bg-orange-400' },
+  ];
+
+  const currentStarInfo = starsList.find(s => s.key === currentStar);
+
+  return (
+    <div className="relative flex items-center shrink-0 select-none" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => {
+          if (currentStar && currentStar !== 'none') {
+            onSelect('none');
+          } else {
+            onSelect('yellow');
+          }
+        }}
+        className="p-1 rounded-lg hover:bg-slate-100 transition-colors"
+        title="Toggle star (right-click or click arrow to categorize)"
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setIsOpen(!isOpen);
+        }}
+      >
+        <Star 
+          size={19} 
+          className={currentStarInfo ? currentStarInfo.color : "text-slate-300 hover:text-amber-400"} 
+          strokeWidth={currentStarInfo ? 1.5 : 2}
+        />
+      </button>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-0.5 rounded hover:bg-slate-100 text-slate-400 transition-colors -ml-1 flex items-center justify-center"
+        title="Select star category"
+      >
+        <ChevronDown size={11} strokeWidth={2.5} />
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div className="absolute left-0 mt-7 w-48 bg-white rounded-xl border border-slate-200 shadow-lg py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-100">
+            <div className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 mb-1">
+              Select Category
+            </div>
+            {starsList.map((s) => (
+              <button
+                key={s.key}
+                onClick={() => {
+                  onSelect(s.key);
+                  setIsOpen(false);
+                }}
+                className={cn(
+                  "w-full text-left px-3 py-2 text-xs font-semibold flex items-center gap-2 text-slate-700 transition-colors",
+                  s.hoverBg,
+                  currentStar === s.key ? "bg-slate-50 font-extrabold text-slate-900" : ""
+                )}
+              >
+                <Star size={14} className={s.color} />
+                <span>{s.label}</span>
+              </button>
+            ))}
+            {currentStar && currentStar !== 'none' && (
+              <button
+                onClick={() => {
+                  onSelect('none');
+                  setIsOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 text-xs font-semibold flex items-center gap-2 text-rose-600 hover:bg-rose-50 border-t border-slate-100 mt-1 transition-colors"
+              >
+                <Star size={14} className="text-slate-300" />
+                <span>Clear Star</span>
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function App() {
   // Auth state
@@ -87,6 +181,7 @@ export default function App() {
   // App logic state
   const [links, setLinks] = useState<Link[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStarFilter, setSelectedStarFilter] = useState<'all' | 'starred' | 'yellow' | 'blue' | 'green' | 'red' | 'orange'>('all');
   const [isAdding, setIsAdding] = useState(false);
   const [newUrl, setNewUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -465,8 +560,30 @@ export default function App() {
     }
   };
 
-  // Perform client-side filtering on links matching search query
+  const handleSelectStar = async (linkId: string, starType: string) => {
+    if (!user) return;
+    try {
+      // Snappily update local state
+      setLinks(prev => prev.map(l => l.id === linkId ? { ...l, star: starType } : l));
+      
+      const docRef = doc(db, 'users', user.uid, 'links', linkId);
+      await updateDoc(docRef, {
+        star: starType,
+        updated_at: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error("Error setting star type:", err);
+    }
+  };
+
+  // Perform client-side filtering on links matching search query and star filter
   const filteredLinks = links.filter((link) => {
+    if (selectedStarFilter === 'starred') {
+      if (!link.star || link.star === 'none') return false;
+    } else if (selectedStarFilter !== 'all') {
+      if (link.star !== selectedStarFilter) return false;
+    }
+
     const q = searchQuery.toLowerCase();
     return (
       link.title.toLowerCase().includes(q) ||
@@ -595,6 +712,95 @@ export default function App() {
             />
           </div>
         )}
+
+        {/* Star Filtering Pills */}
+        {activeTab === 'library' && (
+          <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-none">
+            <button
+              onClick={() => setSelectedStarFilter('all')}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 border",
+                selectedStarFilter === 'all' 
+                  ? "bg-slate-800 text-white border-slate-800" 
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+              )}
+            >
+              All Links
+            </button>
+            <button
+              onClick={() => setSelectedStarFilter('starred')}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 border",
+                selectedStarFilter === 'starred' 
+                  ? "bg-amber-500 text-white border-amber-500" 
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+              )}
+            >
+              <Star size={13} className={selectedStarFilter === 'starred' ? "fill-white text-white" : "fill-amber-400 text-amber-400"} />
+              Starred
+            </button>
+            <button
+              onClick={() => setSelectedStarFilter('yellow')}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 border",
+                selectedStarFilter === 'yellow' 
+                  ? "bg-amber-100 text-amber-800 border-amber-300" 
+                  : "bg-amber-50/40 text-amber-700 border-amber-200/50 hover:bg-amber-50"
+              )}
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-400" />
+              Important
+            </button>
+            <button
+              onClick={() => setSelectedStarFilter('blue')}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 border",
+                selectedStarFilter === 'blue' 
+                  ? "bg-sky-100 text-sky-800 border-sky-300" 
+                  : "bg-sky-50/40 text-sky-700 border-sky-200/50 hover:bg-sky-50"
+              )}
+            >
+              <span className="w-2 h-2 rounded-full bg-sky-400" />
+              Read Later
+            </button>
+            <button
+              onClick={() => setSelectedStarFilter('green')}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 border",
+                selectedStarFilter === 'green' 
+                  ? "bg-emerald-100 text-emerald-800 border-emerald-300" 
+                  : "bg-emerald-50/40 text-emerald-700 border-emerald-200/50 hover:bg-emerald-50"
+              )}
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              Reference
+            </button>
+            <button
+              onClick={() => setSelectedStarFilter('red')}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 border",
+                selectedStarFilter === 'red' 
+                  ? "bg-rose-100 text-rose-800 border-rose-300" 
+                  : "bg-rose-50/40 text-rose-700 border-rose-200/50 hover:bg-rose-50"
+              )}
+            >
+              <span className="w-2 h-2 rounded-full bg-rose-400" />
+              Priority
+            </button>
+            <button
+              onClick={() => setSelectedStarFilter('orange')}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 border",
+                selectedStarFilter === 'orange' 
+                  ? "bg-orange-100 text-orange-800 border-orange-300" 
+                  : "bg-orange-50/40 text-orange-700 border-orange-200/50 hover:bg-orange-50"
+              )}
+            >
+              <span className="w-2 h-2 rounded-full bg-orange-400" />
+              Ideas
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Content Area */}
@@ -669,68 +875,74 @@ export default function App() {
                       className="bg-white rounded-xl border border-slate-200 p-4 active:bg-slate-50 transition-colors cursor-pointer group shadow-xs border-b-2 border-b-slate-200/60"
                     >
                       <div className="flex flex-col md:flex-row md:justify-between md:items-start">
-                        <div className="flex-1 min-w-0 md:pr-4 w-full">
-                          <div className="flex items-center justify-between mb-1">
-                            <h3 className="font-semibold text-slate-800 hover:text-indigo-600 transition-colors leading-tight truncate pr-2">
-                              <a href={link.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                                {link.title}
-                              </a>
-                            </h3>
-                          </div>
-                          <p className="text-[11px] font-medium text-slate-400 truncate mb-2 flex items-center gap-1.5 flex-wrap">
-                            <span>
-                              {(() => {
-                                try {
-                                  return new URL(link.url).hostname;
-                                } catch {
-                                  return link.url;
-                                }
-                              })()}
-                            </span>
-                            {link.created_at && (
-                              <>
-                                <span className="text-slate-300 select-none">•</span>
-                                <span title={`Saved at ${new Date(link.created_at).toLocaleString()}`}>
-                                  Saved {new Date(link.created_at).toLocaleDateString(undefined, {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    year: 'numeric'
-                                  })}
-                                </span>
-                              </>
-                            )}
-                            {link.updated_at && (
-                              <>
-                                <span className="text-slate-300 select-none">•</span>
-                                <span title={`Edited at ${new Date(link.updated_at).toLocaleString()}`}>
-                                  Edited {new Date(link.updated_at).toLocaleDateString(undefined, {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    year: 'numeric'
-                                  })}
-                                </span>
-                              </>
-                            )}
-                          </p>
-                          <p className={cn(
-                            "text-sm text-slate-600 leading-relaxed font-normal transition-all duration-200",
-                            expandedLinkId === link.id ? "" : "line-clamp-2"
-                          )}>
-                            {link.description}
-                          </p>
-                          <div className="flex flex-wrap gap-2 mt-4">
-                            {link.tags.map((tag) => (
-                              <span 
-                                key={tag} 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSearchQuery(tag);
-                                }}
-                                className="text-[10px] font-bold bg-slate-100 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 px-2.5 py-1 rounded-md border border-slate-200/40 transition-colors"
-                              >
-                                #{tag.replace(/\s+/g, '').toLowerCase()}
+                        <div className="flex items-start gap-2.5 flex-1 min-w-0 md:pr-4 w-full">
+                          <StarSelector 
+                            currentStar={link.star} 
+                            onSelect={(starType) => handleSelectStar(link.id, starType)} 
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <h3 className="font-semibold text-slate-800 hover:text-indigo-600 transition-colors leading-tight truncate pr-2">
+                                <a href={link.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                                  {link.title}
+                                </a>
+                              </h3>
+                            </div>
+                            <p className="text-[11px] font-medium text-slate-400 truncate mb-2 flex items-center gap-1.5 flex-wrap">
+                              <span>
+                                {(() => {
+                                  try {
+                                    return new URL(link.url).hostname;
+                                  } catch {
+                                    return link.url;
+                                  }
+                                })()}
                               </span>
-                            ))}
+                              {link.created_at && (
+                                <>
+                                  <span className="text-slate-300 select-none">•</span>
+                                  <span title={`Saved at ${new Date(link.created_at).toLocaleString()}`}>
+                                    Saved {new Date(link.created_at).toLocaleDateString(undefined, {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      year: 'numeric'
+                                    })}
+                                  </span>
+                                </>
+                              )}
+                              {link.updated_at && (
+                                <>
+                                  <span className="text-slate-300 select-none">•</span>
+                                  <span title={`Edited at ${new Date(link.updated_at).toLocaleString()}`}>
+                                    Edited {new Date(link.updated_at).toLocaleDateString(undefined, {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      year: 'numeric'
+                                    })}
+                                  </span>
+                                </>
+                              )}
+                            </p>
+                            <p className={cn(
+                              "text-sm text-slate-600 leading-relaxed font-normal transition-all duration-200",
+                              expandedLinkId === link.id ? "" : "line-clamp-2"
+                            )}>
+                              {link.description}
+                            </p>
+                            <div className="flex flex-wrap gap-2 mt-4">
+                              {link.tags.map((tag) => (
+                                <span 
+                                  key={tag} 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSearchQuery(tag);
+                                  }}
+                                  className="text-[10px] font-bold bg-slate-100 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 px-2.5 py-1 rounded-md border border-slate-200/40 transition-colors"
+                                >
+                                  #{tag.replace(/\s+/g, '').toLowerCase()}
+                                </span>
+                              ))}
+                            </div>
                           </div>
                         </div>
                         <div className="flex flex-row md:flex-col gap-3 md:gap-1.5 mt-4 md:mt-0 justify-end items-center md:items-start opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity border-t border-slate-100 md:border-none pt-3 md:pt-0">
