@@ -75,8 +75,9 @@ self.addEventListener('fetch', (event) => {
                           url.pathname.includes('/assets/') ||
                           url.pathname.includes('lucide');
           if (isAsset) {
+            const responseClone = response.clone();
             caches.open('linkvault-assets-v2').then((cache) => {
-              cache.put(event.request, response.clone());
+              cache.put(event.request, responseClone);
             });
           }
         }
