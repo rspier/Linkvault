@@ -102,14 +102,13 @@ func fetchPageMetadata(ctx context.Context, targetURL string) (string, error) {
 		return "", fmt.Errorf("bad status code: %d", resp.StatusCode)
 	}
 
-	// Limit reading to 64KB to avoid consuming too much memory/bandwidth
-	const maxRead = 64 * 1024
-	buf := make([]byte, maxRead)
-	n, err := io.ReadFull(resp.Body, buf)
-	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
+	// Limit reading to 1.5MB to support heavy pages like YouTube
+	limitReader := io.LimitReader(resp.Body, 1536*1024)
+	htmlContentBytes, err := io.ReadAll(limitReader)
+	if err != nil {
 		return "", err
 	}
-	htmlContent := string(buf[:n])
+	htmlContent := string(htmlContentBytes)
 
 	// Try to extract <head>...</head> content as it contains most metadata (title, og:description, etc.)
 	lowerContent := strings.ToLower(htmlContent)
@@ -128,24 +127,31 @@ func fetchPageMetadata(ctx context.Context, targetURL string) (string, error) {
 }
 
 func stripTags(html, tagName string) string {
+	var sb strings.Builder
+	sb.Grow(len(html))
+
 	lowerHTML := strings.ToLower(html)
 	startTag := "<" + tagName
 	endTag := "</" + tagName + ">"
 
+	idx := 0
 	for {
-		startIdx := strings.Index(lowerHTML, startTag)
+		startIdx := strings.Index(lowerHTML[idx:], startTag)
 		if startIdx == -1 {
+			sb.WriteString(html[idx:])
 			break
 		}
-		endIdx := strings.Index(lowerHTML[startIdx:], endTag)
+		startPos := idx + startIdx
+		sb.WriteString(html[idx:startPos])
+
+		endIdx := strings.Index(lowerHTML[startPos:], endTag)
 		if endIdx == -1 {
+			idx = len(html)
 			break
 		}
-		actualEndIdx := startIdx + endIdx + len(endTag)
-		html = html[:startIdx] + html[actualEndIdx:]
-		lowerHTML = strings.ToLower(html)
+		idx = startPos + endIdx + len(endTag)
 	}
-	return html
+	return sb.String()
 }
 
 func extractMetaTags(html string) string {

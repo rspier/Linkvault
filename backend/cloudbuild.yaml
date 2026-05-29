@@ -21,7 +21,3 @@ steps:
           --cache-from type=registry,ref=us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend:buildcache \
           --cache-to type=registry,ref=us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend:buildcache,mode=max \
           .
-
-# Declare built images as artifacts
-images:
-  - 'us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend:latest'
