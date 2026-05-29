@@ -7,3 +7,4 @@ coverage/
 .env*
 !.env.example
 .firebase
+backend/linkvault-backend

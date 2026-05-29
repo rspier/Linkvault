@@ -1,38 +1,27 @@
 steps:
-  # 1. Pull the previous builder and final images from Artifact Registry to use as cache sources
+  # 1. Setup Buildx builder using the docker-container driver to support registry caching
   - name: 'gcr.io/cloud-builders/docker'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        docker pull us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend-builder:latest || true
-        docker pull us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend:latest || true
+        docker buildx create --name mybuilder --driver docker-container --use
+        docker buildx inspect --bootstrap
 
-  # 2. Build the builder stage, utilizing the builder cache image
+  # 2. Build and push the backend container using buildx remote registry caching (mode=max for all stages)
   - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
     args:
-      - 'build'
-      - '--target'
-      - 'builder'
-      - '--cache-from'
-      - 'us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend-builder:latest'
-      - '-t'
-      - 'us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend-builder:latest'
-      - '.'
+      - '-c'
+      - |
+        docker buildx build \
+          --builder mybuilder \
+          --push \
+          -t us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend:latest \
+          --cache-from type=registry,ref=us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend:buildcache \
+          --cache-to type=registry,ref=us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend:buildcache,mode=max \
+          .
 
-  # 3. Build the final image using both the builder and final cache images
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'build'
-      - '--cache-from'
-      - 'us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend-builder:latest'
-      - '--cache-from'
-      - 'us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend:latest'
-      - '-t'
-      - 'us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend:latest'
-      - '.'
-
-# Push both images back to Artifact Registry
+# Declare built images as artifacts
 images:
-  - 'us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend-builder:latest'
   - 'us-west1-docker.pkg.dev/${PROJECT_ID}/linkvault/backend:latest'
