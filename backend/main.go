@@ -279,16 +279,32 @@ func analyzeLinkHandler(w http.ResponseWriter, r *http.Request) {
 		ResponseSchema:   responseSchema,
 	}
 
-	// Try to fetch target webpage context
-	pageContext, err := fetchPageMetadata(ctx, req.URL)
 	var prompt string
-	if err != nil {
-		log.Printf("Warning: Failed to fetch metadata for URL %s: %v. Falling back to URL-only analysis.", req.URL, err)
-		prompt = fmt.Sprintf("Analyze this URL and provide metadata for a link-saving app.\nURL: %s", req.URL)
-	} else {
-		extractedMeta := extractMetaTags(pageContext)
-		log.Printf("Successfully retrieved and extracted HTML metadata for URL: %s", req.URL)
-		prompt = fmt.Sprintf("Analyze this URL and the provided HTML metadata tags to generate metadata for a link-saving app.\nURL: %s\n\nExtracted HTML Metadata:\n%s", req.URL, extractedMeta)
+	var resolvedByOEmbed bool
+
+	if isYouTubeURL(req.URL) {
+		log.Printf("YouTube URL detected. Attempting to fetch oEmbed metadata for: %s", req.URL)
+		oEmbedData, oErr := fetchYouTubeOEmbed(ctx, req.URL)
+		if oErr == nil {
+			log.Printf("Successfully retrieved YouTube oEmbed metadata for URL: %s", req.URL)
+			prompt = fmt.Sprintf("Analyze this YouTube video and generate metadata (concise title, search-friendly description, tags) for a link-saving app.\nVideo URL: %s\nVideo Title: %s\nChannel Name: %s\nProvider: %s", req.URL, oEmbedData.Title, oEmbedData.AuthorName, oEmbedData.ProviderName)
+			resolvedByOEmbed = true
+		} else {
+			log.Printf("Warning: Failed to fetch YouTube oEmbed: %v. Falling back to page-scraping.", oErr)
+		}
+	}
+
+	if !resolvedByOEmbed {
+		// Try to fetch target webpage context
+		pageContext, err := fetchPageMetadata(ctx, req.URL)
+		if err != nil {
+			log.Printf("Warning: Failed to fetch metadata for URL %s: %v. Falling back to URL-only analysis.", req.URL, err)
+			prompt = fmt.Sprintf("Analyze this URL and provide metadata for a link-saving app.\nURL: %s", req.URL)
+		} else {
+			extractedMeta := extractMetaTags(pageContext)
+			log.Printf("Successfully retrieved and extracted HTML metadata for URL: %s", req.URL)
+			prompt = fmt.Sprintf("Analyze this URL and the provided HTML metadata tags to generate metadata for a link-saving app.\nURL: %s\n\nExtracted HTML Metadata:\n%s", req.URL, extractedMeta)
+		}
 	}
 
 	log.Printf("Sending request to Gemini model for URL: %s", req.URL)
@@ -354,3 +370,48 @@ func main() {
 		log.Fatalf("Failed to start Go server: %v", err)
 	}
 }
+
+type OEmbedResponse struct {
+	Title        string `json:"title"`
+	AuthorName   string `json:"author_name"`
+	AuthorURL    string `json:"author_url"`
+	Type         string `json:"type"`
+	ProviderName string `json:"provider_name"`
+}
+
+func isYouTubeURL(targetURL string) bool {
+	lower := strings.ToLower(targetURL)
+	return strings.Contains(lower, "youtube.com") || strings.Contains(lower, "youtu.be")
+}
+
+func fetchYouTubeOEmbed(ctx context.Context, targetURL string) (*OEmbedResponse, error) {
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	oEmbedURL := fmt.Sprintf("https://www.youtube.com/oembed?url=%s&format=json", strings.ReplaceAll(targetURL, "&", "%26"))
+	req, err := http.NewRequestWithContext(ctx, "GET", oEmbedURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("oEmbed returned status: %d", resp.StatusCode)
+	}
+
+	var oResp OEmbedResponse
+	if err := json.NewDecoder(resp.Body).Decode(&oResp); err != nil {
+		return nil, err
+	}
+
+	return &oResp, nil
+}
+

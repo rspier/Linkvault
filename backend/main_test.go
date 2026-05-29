@@ -70,3 +70,25 @@ func TestExtractMetaTags(t *testing.T) {
 		t.Errorf("Should not extract fake meta tag from script: %s", extracted)
 	}
 }
+
+func TestIsYouTubeURL(t *testing.T) {
+	tests := []struct {
+		url      string
+		expected bool
+	}{
+		{"https://www.youtube.com/watch?v=NNOERTEh1Bo", true},
+		{"https://youtu.be/NNOERTEh1Bo", true},
+		{"https://m.youtube.com/watch?v=NNOERTEh1Bo", true},
+		{"https://youtube.com/embed/NNOERTEh1Bo", true},
+		{"https://google.com", false},
+		{"https://github.com/youtube/youtube", false},
+	}
+
+	for _, tc := range tests {
+		res := isYouTubeURL(tc.url)
+		if res != tc.expected {
+			t.Errorf("isYouTubeURL(%q) = %t; want %t", tc.url, res, tc.expected)
+		}
+	}
+}
+
