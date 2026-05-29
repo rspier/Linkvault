@@ -264,7 +264,7 @@ func analyzeLinkHandler(w http.ResponseWriter, r *http.Request) {
 		Type: genai.TypeObject,
 		Properties: map[string]*genai.Schema{
 			"title":       {Type: genai.TypeString, Description: "A concise, clear title for the link."},
-			"description": {Type: genai.TypeString, Description: "A search-friendly description (1-2 sentences)."},
+			"description": {Type: genai.TypeString, Description: "A search-friendly, informative summary description (2-4 sentences)."},
 			"tags": {
 				Type: genai.TypeArray,
 				Items: &genai.Schema{Type: genai.TypeString},
@@ -287,7 +287,7 @@ func analyzeLinkHandler(w http.ResponseWriter, r *http.Request) {
 		oEmbedData, oErr := fetchYouTubeOEmbed(ctx, req.URL)
 		if oErr == nil {
 			log.Printf("Successfully retrieved YouTube oEmbed metadata for URL: %s", req.URL)
-			prompt = fmt.Sprintf("Analyze this YouTube video and generate metadata (concise title, search-friendly description, tags) for a link-saving app.\nVideo URL: %s\nVideo Title: %s\nChannel Name: %s\nProvider: %s", req.URL, oEmbedData.Title, oEmbedData.AuthorName, oEmbedData.ProviderName)
+			prompt = fmt.Sprintf("Analyze this YouTube video and generate metadata (concise title, search-friendly summary description of 2-4 sentences, tags) for a link-saving app.\nVideo URL: %s\nVideo Title: %s\nChannel Name: %s\nProvider: %s", req.URL, oEmbedData.Title, oEmbedData.AuthorName, oEmbedData.ProviderName)
 			resolvedByOEmbed = true
 		} else {
 			log.Printf("Warning: Failed to fetch YouTube oEmbed: %v. Falling back to page-scraping.", oErr)
@@ -299,11 +299,11 @@ func analyzeLinkHandler(w http.ResponseWriter, r *http.Request) {
 		pageContext, err := fetchPageMetadata(ctx, req.URL)
 		if err != nil {
 			log.Printf("Warning: Failed to fetch metadata for URL %s: %v. Falling back to URL-only analysis.", req.URL, err)
-			prompt = fmt.Sprintf("Analyze this URL and provide metadata for a link-saving app.\nURL: %s", req.URL)
+			prompt = fmt.Sprintf("Analyze this URL and provide metadata (including a summary description of 2-4 sentences) for a link-saving app.\nURL: %s", req.URL)
 		} else {
 			extractedMeta := extractMetaTags(pageContext)
 			log.Printf("Successfully retrieved and extracted HTML metadata for URL: %s", req.URL)
-			prompt = fmt.Sprintf("Analyze this URL and the provided HTML metadata tags to generate metadata for a link-saving app.\nURL: %s\n\nExtracted HTML Metadata:\n%s", req.URL, extractedMeta)
+			prompt = fmt.Sprintf("Analyze this URL and the provided HTML metadata tags to generate metadata (including a summary description of 2-4 sentences) for a link-saving app.\nURL: %s\n\nExtracted HTML Metadata:\n%s", req.URL, extractedMeta)
 		}
 	}
 
