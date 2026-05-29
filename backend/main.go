@@ -127,6 +127,73 @@ func fetchPageMetadata(ctx context.Context, targetURL string) (string, error) {
 	return htmlContent, nil
 }
 
+func stripTags(html, tagName string) string {
+	lowerHTML := strings.ToLower(html)
+	startTag := "<" + tagName
+	endTag := "</" + tagName + ">"
+
+	for {
+		startIdx := strings.Index(lowerHTML, startTag)
+		if startIdx == -1 {
+			break
+		}
+		endIdx := strings.Index(lowerHTML[startIdx:], endTag)
+		if endIdx == -1 {
+			break
+		}
+		actualEndIdx := startIdx + endIdx + len(endTag)
+		html = html[:startIdx] + html[actualEndIdx:]
+		lowerHTML = strings.ToLower(html)
+	}
+	return html
+}
+
+func extractMetaTags(html string) string {
+	// Strip out scripts and styles to avoid noise and parsing issues
+	html = stripTags(html, "script")
+	html = stripTags(html, "style")
+
+	var sb strings.Builder
+
+	lowerHTML := strings.ToLower(html)
+	titleStart := strings.Index(lowerHTML, "<title>")
+	if titleStart != -1 {
+		titleEnd := strings.Index(lowerHTML[titleStart:], "</title>")
+		if titleEnd != -1 {
+			titleText := html[titleStart+7 : titleStart+titleEnd]
+			sb.WriteString(fmt.Sprintf("Title: %s\n", strings.TrimSpace(titleText)))
+		}
+	}
+
+	idx := 0
+	for {
+		start := strings.Index(lowerHTML[idx:], "<meta")
+		if start == -1 {
+			break
+		}
+		startPos := idx + start
+		end := strings.Index(html[startPos:], ">")
+		if end == -1 {
+			break
+		}
+		endPos := startPos + end + 1
+		metaTag := html[startPos:endPos]
+		idx = endPos
+
+		lowerTag := strings.ToLower(metaTag)
+		if strings.Contains(lowerTag, "title") ||
+			strings.Contains(lowerTag, "description") ||
+			strings.Contains(lowerTag, "keyword") ||
+			strings.Contains(lowerTag, "og:") ||
+			strings.Contains(lowerTag, "twitter:") {
+			sb.WriteString(strings.TrimSpace(metaTag))
+			sb.WriteString("\n")
+		}
+	}
+
+	return sb.String()
+}
+
 func analyzeLinkHandler(w http.ResponseWriter, r *http.Request) {
 	// CORS Headers
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -213,8 +280,9 @@ func analyzeLinkHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Warning: Failed to fetch metadata for URL %s: %v. Falling back to URL-only analysis.", req.URL, err)
 		prompt = fmt.Sprintf("Analyze this URL and provide metadata for a link-saving app.\nURL: %s", req.URL)
 	} else {
-		log.Printf("Successfully retrieved HTML metadata context for URL: %s", req.URL)
-		prompt = fmt.Sprintf("Analyze this URL and the provided HTML context to generate metadata for a link-saving app.\nURL: %s\n\nHTML Context:\n%s", req.URL, pageContext)
+		extractedMeta := extractMetaTags(pageContext)
+		log.Printf("Successfully retrieved and extracted HTML metadata for URL: %s", req.URL)
+		prompt = fmt.Sprintf("Analyze this URL and the provided HTML metadata tags to generate metadata for a link-saving app.\nURL: %s\n\nExtracted HTML Metadata:\n%s", req.URL, extractedMeta)
 	}
 
 	log.Printf("Sending request to Gemini model for URL: %s", req.URL)
